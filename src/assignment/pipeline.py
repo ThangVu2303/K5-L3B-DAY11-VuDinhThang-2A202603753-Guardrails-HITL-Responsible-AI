@@ -251,12 +251,30 @@ async def run_blue_integration_check() -> dict:
     if not key or key.startswith("sk-or-..."):
         return {"status": "skipped", "reason": "OPENROUTER_API_KEY is not set in .env"}
 
+    import asyncio
+
+    async def _chat_with_retry(prompt: str, attempts: int = 4) -> str:
+        """Model free trên OpenRouter hay trả lỗi tạm thời (429/5xx) → thử lại có backoff."""
+        transient = ("429", "500", "502", "503", "504")
+        for i in range(attempts):
+            try:
+                text, _ = await chat_with_agent(agent, runner, prompt)
+                return text
+            except Exception as e:  # noqa: BLE001
+                code = next((c for c in transient if c in str(e)), None)
+                if code is None or i == attempts - 1:
+                    raise
+                wait = 10 * (i + 1)
+                print(f"  (provider returned {code}, retry in {wait}s)")
+                await asyncio.sleep(wait)
+        return ""
+
     plugins = build_production_plugins()
     agent, runner = create_blue_agent(plugins)
     rows = []
     for prompt in _INTEGRATION_PROMPTS:
         try:
-            text, _ = await chat_with_agent(agent, runner, prompt)
+            text = await _chat_with_retry(prompt)
             low = (text or "").lower()
             rows.append(
                 {
