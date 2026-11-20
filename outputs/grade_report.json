@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T09:54:16.590105+00:00",
+  "generated_at": "2026-11-20T10:22:59.334538+00:00",
   "submission_dir": "C:\\Users\\Gigabyte\\OneDrive\\M\u00e1y t\u00ednh\\K5-L3B-DAY11-VuDinhThang-2A202603753-Guardrails-HITL-Responsible-AI",
   "technical_failure": false,
   "packaging": {
@@ -47,7 +47,7 @@
   },
   "public_tests": {
     "returncode": 0,
-    "stdout": "..........                                                               [100%]\n10 passed in 1.27s\n",
+    "stdout": "..........                                                               [100%]\n10 passed in 1.14s\n",
     "stderr": "",
     "technical_failure": false
   },
