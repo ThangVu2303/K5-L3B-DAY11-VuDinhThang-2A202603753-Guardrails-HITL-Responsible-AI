@@ -42,16 +42,54 @@ class MonitoringAlert:
     judge_fails: int = 0
 
     def check_metrics(self) -> list[Alert]:
-        """TODO: compute rates, append Alert objects when thresholds exceeded."""
-        raise NotImplementedError("Implement MonitoringAlert.check_metrics")
+        """Tính các tỉ lệ, tạo Alert khi vượt ngưỡng (gọi lại nhiều lần vẫn không trùng)."""
+        snap = self.snapshot()
+        alerts: list[Alert] = []
+
+        if snap["block_rate"] > self.block_rate_threshold:
+            alerts.append(
+                Alert(
+                    "block_rate",
+                    snap["block_rate"],
+                    self.block_rate_threshold,
+                    f"Block rate {snap['block_rate']:.0%} exceeds threshold "
+                    f"{self.block_rate_threshold:.0%} - possible attack.",
+                )
+            )
+        if self.rate_limit_hits >= self.rate_limit_hit_threshold:
+            alerts.append(
+                Alert(
+                    "rate_limit_hits",
+                    float(self.rate_limit_hits),
+                    float(self.rate_limit_hit_threshold),
+                    f"{self.rate_limit_hits} rate-limit hits - possible spam/flood.",
+                )
+            )
+        if snap["judge_fail_rate"] > self.judge_fail_rate_threshold:
+            alerts.append(
+                Alert(
+                    "judge_fail_rate",
+                    snap["judge_fail_rate"],
+                    self.judge_fail_rate_threshold,
+                    f"Judge fail rate {snap['judge_fail_rate']:.0%} exceeds threshold.",
+                )
+            )
+
+        self.alerts = alerts
+        for a in alerts:
+            print(f"[ALERT] {a.metric}: {a.message}")
+        return alerts
 
     def export_json(self, filepath: str | None = None):
-        """TODO: write metrics + alerts to JSON under repo-root ``outputs/`` by default.
-        Use ``filepath or default_metrics_path()`` so running from ``src/`` does not
-        create ``src/outputs/``.
-        """
-        _ = filepath or default_metrics_path()
-        raise NotImplementedError("Implement MonitoringAlert.export_json")
+        """Ghi metrics + alerts ra ``outputs/metrics.json`` (gốc repo)."""
+        self.check_metrics()
+        path = Path(filepath or default_metrics_path())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(self.snapshot(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return path
 
     def snapshot(self) -> dict:
         block_rate = (

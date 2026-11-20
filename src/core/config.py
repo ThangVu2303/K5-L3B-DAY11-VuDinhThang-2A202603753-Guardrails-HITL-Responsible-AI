@@ -139,20 +139,31 @@ def get_red_provider() -> str:
     ).strip().lower()
     if raw in {"gemini", "google", "adk"}:
         return PROVIDER_GEMINI
+    if raw == "openrouter":
+        # Red gọi cùng model OpenAI nhưng đi qua OpenRouter (dùng OPENROUTER_API_KEY)
+        return PROVIDER_OPENROUTER
     return PROVIDER_OPENAI
 
 
 def get_red_model() -> str:
-    """Model Red Team từ .env (cùng cho default + advance)."""
-    if get_red_provider() == PROVIDER_GEMINI:
+    """Model Red Team từ .env (cùng cho default + advance).
+
+    Với ``openrouter``: vẫn dùng ``OPENAI_MODEL`` (mặc định ``gpt-4o-mini``) nhưng
+    OpenRouter yêu cầu tên có tiền tố nhà cung cấp → tự thêm ``openai/``.
+    """
+    provider = get_red_provider()
+    if provider == PROVIDER_GEMINI:
         return (
             os.environ.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL).strip()
             or DEFAULT_GEMINI_MODEL
         )
-    return (
+    model = (
         os.environ.get("OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip()
         or DEFAULT_OPENAI_MODEL
     )
+    if provider == PROVIDER_OPENROUTER and "/" not in model:
+        model = f"openai/{model}"
+    return model
 
 
 def get_red_model_default() -> str:
@@ -170,6 +181,8 @@ def get_openai_api_key() -> str:
 
 
 def red_openai_client_kwargs() -> dict:
+    if get_red_provider() == PROVIDER_OPENROUTER:
+        return blue_client_kwargs()  # cùng key + base_url OpenRouter
     return {"api_key": get_openai_api_key() or None}
 
 
@@ -180,7 +193,8 @@ def red_provider_label(tier: str = "advance") -> str:
 
 
 def red_uses_openai_sdk() -> bool:
-    return get_red_provider() == PROVIDER_OPENAI
+    # openai và openrouter đều đi qua OpenAI SDK (khác nhau ở base_url / key)
+    return get_red_provider() in {PROVIDER_OPENAI, PROVIDER_OPENROUTER}
 
 
 def red_uses_gemini() -> bool:
@@ -216,7 +230,7 @@ def provider_label() -> str:
 
 def is_harder_model() -> bool:
     """True nếu .env đang trỏ model khó (luna / 3.8) — tuỳ chọn, không phải tên agent."""
-    m = get_red_model().lower()
+    m = get_red_model().lower().split("/")[-1]  # bỏ tiền tố "openai/" của OpenRouter
     if m in {DEFAULT_OPENAI_MODEL.lower(), DEFAULT_GEMINI_MODEL.lower()}:
         return False
     hard = {
@@ -249,6 +263,8 @@ def setup_api_key():
             os.environ["GOOGLE_API_KEY"] = input("Enter Google API Key (Red): ").strip()
         os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "0"
         print(f"Red / Red Advance  — gemini:{model}")
+    elif red == PROVIDER_OPENROUTER:
+        print(f"Red / Red Advance  — openrouter:{model}  (dùng OPENROUTER_API_KEY)")
     else:
         if not get_openai_api_key():
             os.environ["OPENAI_API_KEY"] = input("Enter OpenAI API Key (Red): ").strip()
